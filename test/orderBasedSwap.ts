@@ -37,7 +37,7 @@ describe("OrderBasedSwap", function () {
 					.connect(user1)
 					.createOrder(tokenA, tokenB, depositAmount, swapAmount)
 			)
-				.to.emit(orderBasedSwap, "OrderCreatedsuccessfully")
+				.to.emit(orderBasedSwap, "OrderCreated")
 				.withArgs(user1.address, tokenA, tokenB, depositAmount);
 
 			const order = await orderBasedSwap.ordersById(1);
@@ -48,6 +48,20 @@ describe("OrderBasedSwap", function () {
 			expect(order.depositor).to.equal(user1.address);
 			expect(order.isCompleted).to.be.false;
 		});
+
+        it("Should revert if using same token", async function() {
+            const { orderBasedSwap, tokenA, user1 } = await loadFixture(deployFixture);
+            const depositAmount = ethers.parseEther("100");
+            const swapAmount = ethers.parseEther("200");
+
+            await tokenA.connect(user1).approve(orderBasedSwap, depositAmount);
+
+            await expect(
+                orderBasedSwap
+                    .connect(user1)
+                    .createOrder(tokenA, tokenA, depositAmount, swapAmount)
+            ).to.be.revertedWithCustomError(orderBasedSwap, "SameTokenNotAllowed");
+        })
 
 		it("Should revert when creating an order with zero amount", async function () {
 			const { orderBasedSwap, tokenA, tokenB, user1 } = await loadFixture(
@@ -89,7 +103,7 @@ describe("OrderBasedSwap", function () {
 			// Swap tokens
 			await tokenB.connect(user2).approve(orderBasedSwap, swapAmount);
 			await expect(orderBasedSwap.connect(user2).swapToken(1))
-				.to.emit(orderBasedSwap, "TokenSwappedsuccessfully")
+				.to.emit(orderBasedSwap, "TokenSwapped")
 				.withArgs(user2.address, 1);
 
 			// Check balances

@@ -8,6 +8,7 @@ error InsufficientFunds();
 error OrderAlreadyCompleted();
 error InsufficientContractBalance();
 error InvalidOrderId();
+error SameTokenNotAllowed();
 
 contract OrderBasedSwap {
     uint256 private nextOrderId = 1;
@@ -26,16 +27,13 @@ contract OrderBasedSwap {
     mapping(address depositor => uint256[] orderIds) public userOrders;
     mapping(uint256 orderId => Order) public ordersById;
 
-    event OrderCreatedsuccessfully(
+    event OrderCreated(
         address indexed depositor,
         IERC20 depositToken,
         IERC20 swapWithToken,
         uint256 depositAmt
     );
-    event TokenSwappedsuccessfully(
-        address indexed swapBy,
-        uint256 indexed orderId
-    );
+    event TokenSwapped(address indexed swapBy, uint256 indexed orderId);
 
     function createOrder(
         IERC20 _depositToken,
@@ -45,6 +43,10 @@ contract OrderBasedSwap {
     ) external {
         if (msg.sender == address(0)) {
             revert AddressZeroDetected();
+        }
+
+        if (_depositToken == _swapWithToken) {
+            revert SameTokenNotAllowed();
         }
 
         if (_depositAmt <= 0 || _swapWithAmt <= 0) {
@@ -70,7 +72,7 @@ contract OrderBasedSwap {
         );
         allOrders.push(currentOrderId);
         userOrders[msg.sender].push(currentOrderId);
-        emit OrderCreatedsuccessfully(
+        emit OrderCreated(
             msg.sender,
             _depositToken,
             _swapWithToken,
@@ -110,6 +112,6 @@ contract OrderBasedSwap {
         order.isCompleted = true;
         order.swapBy = msg.sender;
         depositToken.transfer(msg.sender, order.depositAmount);
-        emit TokenSwappedsuccessfully(msg.sender, _orderId);
+        emit TokenSwapped(msg.sender, _orderId);
     }
 }
