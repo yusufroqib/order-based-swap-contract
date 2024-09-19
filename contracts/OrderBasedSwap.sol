@@ -7,6 +7,7 @@ error AddressZeroDetected();
 error InsufficientFunds();
 error OrderAlreadyCompleted();
 error InsufficientContractBalance();
+error InvalidOrderId();
 
 contract OrderBasedSwap {
     uint256 private nextOrderId = 1;
@@ -80,6 +81,10 @@ contract OrderBasedSwap {
     function swapToken(uint256 _orderId) external {
         if (msg.sender == address(0)) {
             revert AddressZeroDetected();
+        }
+
+        if (_orderId >= nextOrderId || _orderId < 1) {
+            revert InvalidOrderId();
         }
 
         Order storage order = ordersById[_orderId];

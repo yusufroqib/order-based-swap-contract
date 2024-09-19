@@ -101,6 +101,40 @@ describe("OrderBasedSwap", function () {
 			expect(order.swapBy).to.equal(user2.address);
 		});
 
+		it("Should revert with custom error if Id less than 1", async function () {
+			const { orderBasedSwap, tokenA, tokenB, user1, user2 } =
+				await loadFixture(deployFixture);
+			const depositAmount = ethers.parseEther("100");
+			const swapAmount = ethers.parseEther("200");
+
+			// Create and complete an order
+			await tokenA.connect(user1).approve(orderBasedSwap, depositAmount);
+			await orderBasedSwap
+				.connect(user1)
+				.createOrder(tokenA, tokenB, depositAmount, swapAmount);
+			await tokenB.connect(user2).approve(orderBasedSwap, swapAmount);
+			await expect(
+				orderBasedSwap.connect(user2).swapToken(0)
+			).to.be.revertedWithCustomError(orderBasedSwap, "InvalidOrderId");
+		});
+
+		it("Should revert with custom error if Id is greater than 1 but invalid", async function () {
+			const { orderBasedSwap, tokenA, tokenB, user1, user2 } =
+				await loadFixture(deployFixture);
+			const depositAmount = ethers.parseEther("100");
+			const swapAmount = ethers.parseEther("200");
+
+			// Create and complete an order
+			await tokenA.connect(user1).approve(orderBasedSwap, depositAmount);
+			await orderBasedSwap
+				.connect(user1)
+				.createOrder(tokenA, tokenB, depositAmount, swapAmount);
+			await tokenB.connect(user2).approve(orderBasedSwap, swapAmount);
+			await expect(
+				orderBasedSwap.connect(user2).swapToken(5)
+			).to.be.revertedWithCustomError(orderBasedSwap, "InvalidOrderId");
+		});
+
 		it("Should revert when swapping an already completed order", async function () {
 			const { orderBasedSwap, tokenA, tokenB, user1, user2 } =
 				await loadFixture(deployFixture);
@@ -125,7 +159,7 @@ describe("OrderBasedSwap", function () {
 			const { orderBasedSwap, tokenA, tokenB, user1, user2 } =
 				await loadFixture(deployFixture);
 			const depositAmount = ethers.parseEther("100");
-			const swapAmount = ethers.parseEther("2000"); 
+			const swapAmount = ethers.parseEther("2000");
 
 			// Create order
 			await tokenA.connect(user1).approve(orderBasedSwap, depositAmount);
