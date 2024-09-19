@@ -9,6 +9,8 @@ error OrderAlreadyCompleted();
 error InsufficientContractBalance();
 error InvalidOrderId();
 error SameTokenNotAllowed();
+error OrderNotActive();
+error UnAuthorizedCaller();
 
 contract OrderBasedSwap {
     uint256 private nextOrderId = 1;
@@ -20,6 +22,7 @@ contract OrderBasedSwap {
         uint swapWithAmount;
         address depositor;
         address swapBy;
+        bool isActive;
         bool isCompleted;
     }
 
@@ -34,6 +37,7 @@ contract OrderBasedSwap {
         uint256 depositAmt
     );
     event TokenSwapped(address indexed swapBy, uint256 indexed orderId);
+    event OrderCancelled(address indexed cancelledBy, uint256 indexed orderId);
 
     function createOrder(
         IERC20 _depositToken,
@@ -68,6 +72,7 @@ contract OrderBasedSwap {
             _swapWithAmt,
             msg.sender,
             address(0),
+            true,
             false
         );
         allOrders.push(currentOrderId);
@@ -94,6 +99,10 @@ contract OrderBasedSwap {
             revert OrderAlreadyCompleted();
         }
 
+        if (!order.isActive) {
+            revert OrderNotActive();
+        }
+
         IERC20 depositToken = order.depositToken;
         IERC20 swapWithToken = order.swapWithToken;
 
@@ -110,8 +119,34 @@ contract OrderBasedSwap {
             order.swapWithAmount
         );
         order.isCompleted = true;
+        order.isActive = false;
         order.swapBy = msg.sender;
         depositToken.transfer(msg.sender, order.depositAmount);
         emit TokenSwapped(msg.sender, _orderId);
+    }
+
+    function cancelOrder(uint256 _orderId) external {
+        if (msg.sender == address(0)) {
+            revert AddressZeroDetected();
+        }
+
+        if (_orderId >= nextOrderId || _orderId < 1) {
+            revert InvalidOrderId();
+        }
+
+        Order storage order = ordersById[_orderId];
+        if (order.isCompleted) {
+            revert OrderAlreadyCompleted();
+        }
+
+        if (!order.isActive) {
+            revert OrderNotActive();
+        }
+        if (order.depositor != msg.sender) {
+            revert UnAuthorizedCaller();
+        }
+        order.isActive = false;
+        order.depositToken.transfer(msg.sender, order.depositAmount);
+        emit OrderCancelled(msg.sender, _orderId);
     }
 }

@@ -46,22 +46,25 @@ describe("OrderBasedSwap", function () {
 			expect(order.depositAmount).to.equal(depositAmount);
 			expect(order.swapWithAmount).to.equal(swapAmount);
 			expect(order.depositor).to.equal(user1.address);
+            expect(order.isActive).to.be.true;
 			expect(order.isCompleted).to.be.false;
 		});
 
-        it("Should revert if using same token", async function() {
-            const { orderBasedSwap, tokenA, user1 } = await loadFixture(deployFixture);
-            const depositAmount = ethers.parseEther("100");
-            const swapAmount = ethers.parseEther("200");
+		it("Should revert if using same token", async function () {
+			const { orderBasedSwap, tokenA, user1 } = await loadFixture(
+				deployFixture
+			);
+			const depositAmount = ethers.parseEther("100");
+			const swapAmount = ethers.parseEther("200");
 
-            await tokenA.connect(user1).approve(orderBasedSwap, depositAmount);
+			await tokenA.connect(user1).approve(orderBasedSwap, depositAmount);
 
-            await expect(
-                orderBasedSwap
-                    .connect(user1)
-                    .createOrder(tokenA, tokenA, depositAmount, swapAmount)
-            ).to.be.revertedWithCustomError(orderBasedSwap, "SameTokenNotAllowed");
-        })
+			await expect(
+				orderBasedSwap
+					.connect(user1)
+					.createOrder(tokenA, tokenA, depositAmount, swapAmount)
+			).to.be.revertedWithCustomError(orderBasedSwap, "SameTokenNotAllowed");
+		});
 
 		it("Should revert when creating an order with zero amount", async function () {
 			const { orderBasedSwap, tokenA, tokenB, user1 } = await loadFixture(
@@ -71,6 +74,11 @@ describe("OrderBasedSwap", function () {
 				orderBasedSwap
 					.connect(user1)
 					.createOrder(tokenA, tokenB, 0, ethers.parseEther("100"))
+			).to.be.revertedWithCustomError(orderBasedSwap, "ZeroValueNotAllowed");
+			await expect(
+				orderBasedSwap
+					.connect(user1)
+					.createOrder(tokenA, tokenB, ethers.parseEther("100"), 0)
 			).to.be.revertedWithCustomError(orderBasedSwap, "ZeroValueNotAllowed");
 		});
 
@@ -112,6 +120,7 @@ describe("OrderBasedSwap", function () {
 
 			const order = await orderBasedSwap.ordersById(1);
 			expect(order.isCompleted).to.be.true;
+			expect(order.isActive).to.be.false;
 			expect(order.swapBy).to.equal(user2.address);
 		});
 
@@ -187,6 +196,24 @@ describe("OrderBasedSwap", function () {
 				orderBasedSwap.connect(user2).swapToken(1)
 			).to.be.revertedWithCustomError(orderBasedSwap, "InsufficientFunds");
 		});
+		it("Should revert when swapping an inactive order", async function () {
+			const { orderBasedSwap, tokenA, tokenB, user1, user2 } =
+				await loadFixture(deployFixture);
+			const depositAmount = ethers.parseEther("100");
+			const swapAmount = ethers.parseEther("200");
+
+			// Create and cancel an order
+			await tokenA.connect(user1).approve(orderBasedSwap, depositAmount);
+			await orderBasedSwap
+				.connect(user1)
+				.createOrder(tokenA, tokenB, depositAmount, swapAmount);
+			await orderBasedSwap.connect(user1).cancelOrder(1);
+
+			// Try to swap
+			await expect(
+				orderBasedSwap.connect(user2).swapToken(1)
+			).to.be.revertedWithCustomError(orderBasedSwap, "OrderNotActive");
+		});
 	});
 
 	describe("Order tracking", function () {
@@ -231,6 +258,100 @@ describe("OrderBasedSwap", function () {
 
 			expect(await orderBasedSwap.userOrders(user1.address, 0)).to.equal(1);
 			expect(await orderBasedSwap.userOrders(user1.address, 1)).to.equal(2);
+		});
+	});
+
+	describe("cancelOrder", function () {
+		it("Should cancel an order successfully", async function () {
+			const { orderBasedSwap, tokenA, tokenB, user1 } = await loadFixture(
+				deployFixture
+			);
+			const depositAmount = ethers.parseEther("100");
+			const swapAmount = ethers.parseEther("200");
+
+			// Create order
+			await tokenA.connect(user1).approve(orderBasedSwap, depositAmount);
+			await orderBasedSwap
+				.connect(user1)
+				.createOrder(tokenA, tokenB, depositAmount, swapAmount);
+
+			// Cancel order
+			await expect(orderBasedSwap.connect(user1).cancelOrder(1))
+				.to.emit(orderBasedSwap, "OrderCancelled")
+				.withArgs(user1.address, 1);
+
+			const order = await orderBasedSwap.ordersById(1);
+			expect(order.isActive).to.be.false;
+
+			// Check if tokens are returned
+			expect(await tokenA.balanceOf(user1.address)).to.equal(
+				ethers.parseEther("1000")
+			);
+		});
+
+		it("Should revert when cancelling an already completed order", async function () {
+			const { orderBasedSwap, tokenA, tokenB, user1, user2 } =
+				await loadFixture(deployFixture);
+			const depositAmount = ethers.parseEther("100");
+			const swapAmount = ethers.parseEther("200");
+
+			// Create and complete an order
+			await tokenA.connect(user1).approve(orderBasedSwap, depositAmount);
+			await orderBasedSwap
+				.connect(user1)
+				.createOrder(tokenA, tokenB, depositAmount, swapAmount);
+			await tokenB.connect(user2).approve(orderBasedSwap, swapAmount);
+			await orderBasedSwap.connect(user2).swapToken(1);
+
+			// Try to cancel
+			await expect(
+				orderBasedSwap.connect(user1).cancelOrder(1)
+			).to.be.revertedWithCustomError(orderBasedSwap, "OrderAlreadyCompleted");
+		});
+
+		it("Should revert when cancelling with an invalid order ID", async function () {
+			const { orderBasedSwap, user1 } = await loadFixture(deployFixture);
+			await expect(
+				orderBasedSwap.connect(user1).cancelOrder(999)
+			).to.be.revertedWithCustomError(orderBasedSwap, "InvalidOrderId");
+		});
+
+		it("Should revert when cancelling an inactive order", async function () {
+			const { orderBasedSwap, tokenA, tokenB, user1 } = await loadFixture(
+				deployFixture
+			);
+			const depositAmount = ethers.parseEther("100");
+			const swapAmount = ethers.parseEther("200");
+
+			// Create and cancel an order
+			await tokenA.connect(user1).approve(orderBasedSwap, depositAmount);
+			await orderBasedSwap
+				.connect(user1)
+				.createOrder(tokenA, tokenB, depositAmount, swapAmount);
+			await orderBasedSwap.connect(user1).cancelOrder(1);
+
+			// Try to cancel again
+			await expect(
+				orderBasedSwap.connect(user1).cancelOrder(1)
+			).to.be.revertedWithCustomError(orderBasedSwap, "OrderNotActive");
+		});
+
+		it("Should revert when cancelling an order by a non-depositor", async function () {
+			const { orderBasedSwap, tokenA, tokenB, user1, user2 } =
+				await loadFixture(deployFixture);
+			const depositAmount = ethers.parseEther("100");
+			const swapAmount = ethers.parseEther("200");
+
+			// Create order
+			await tokenA.connect(user1).approve(orderBasedSwap, depositAmount);
+			await orderBasedSwap
+				.connect(user1)
+				.createOrder(tokenA, tokenB, depositAmount, swapAmount);
+
+			// Try to cancel by non-depositor
+			await expect(
+				orderBasedSwap.connect(user2).cancelOrder(1)
+			).to.be.revertedWithCustomError(orderBasedSwap, "UnAuthorizedCaller");
 		});
 	});
 });
