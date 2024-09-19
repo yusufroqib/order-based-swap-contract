@@ -46,7 +46,7 @@ describe("OrderBasedSwap", function () {
 			expect(order.depositAmount).to.equal(depositAmount);
 			expect(order.swapWithAmount).to.equal(swapAmount);
 			expect(order.depositor).to.equal(user1.address);
-            expect(order.isActive).to.be.true;
+			expect(order.isActive).to.be.true;
 			expect(order.isCompleted).to.be.false;
 		});
 
@@ -217,28 +217,6 @@ describe("OrderBasedSwap", function () {
 	});
 
 	describe("Order tracking", function () {
-		it("Should correctly track all orders", async function () {
-			const { orderBasedSwap, tokenA, tokenB, user1 } = await loadFixture(
-				deployFixture
-			);
-			const depositAmount = ethers.parseEther("100");
-			const swapAmount = ethers.parseEther("200");
-
-			await tokenA.connect(user1).approve(orderBasedSwap, depositAmount);
-			await orderBasedSwap
-				.connect(user1)
-				.createOrder(tokenA, tokenB, depositAmount, swapAmount);
-			expect(await orderBasedSwap.allOrders(0)).to.equal(1);
-
-			await tokenA.connect(user1).approve(orderBasedSwap, depositAmount);
-
-			await orderBasedSwap
-				.connect(user1)
-				.createOrder(tokenA, tokenB, depositAmount, swapAmount);
-
-			expect(await orderBasedSwap.allOrders(1)).to.equal(2);
-		});
-
 		it("Should correctly track user orders", async function () {
 			const { orderBasedSwap, tokenA, tokenB, user1 } = await loadFixture(
 				deployFixture

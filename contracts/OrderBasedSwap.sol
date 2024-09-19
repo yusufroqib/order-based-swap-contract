@@ -26,7 +26,6 @@ contract OrderBasedSwap {
         bool isCompleted;
     }
 
-    uint256[] public allOrders;
     mapping(address depositor => uint256[] orderIds) public userOrders;
     mapping(uint256 orderId => Order) public ordersById;
 
@@ -75,7 +74,6 @@ contract OrderBasedSwap {
             true,
             false
         );
-        allOrders.push(currentOrderId);
         userOrders[msg.sender].push(currentOrderId);
         emit OrderCreated(
             msg.sender,
@@ -149,4 +147,6 @@ contract OrderBasedSwap {
         order.depositToken.transfer(msg.sender, order.depositAmount);
         emit OrderCancelled(msg.sender, _orderId);
     }
+
+    
 }
